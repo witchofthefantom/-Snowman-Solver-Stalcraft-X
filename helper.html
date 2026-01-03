@@ -432,7 +432,6 @@
 </div>
 
 <script>
-// -------------------- Инициализация темы --------------------
 const themeToggle = document.getElementById('theme-toggle');
 const themeIcon = document.getElementById('theme-icon');
 const themeText = document.getElementById('theme-text');
@@ -451,7 +450,6 @@ function updateTheme() {
   }
 }
 
-// Загружаем сохранённую тему
 const savedTheme = localStorage.getItem('theme');
 if (savedTheme === 'dark') {
   themeToggle.checked = true;
@@ -464,7 +462,6 @@ themeIcon.addEventListener('click', () => {
   updateTheme();
 });
 
-// -------------------- Структуры данных и переменные --------------------
 const rows = 5;
 const cols = 6;
 const totalGold = 4;
@@ -477,8 +474,8 @@ function initializeTileData() {
     for (let c = 0; c < cols; c++) {
       tileData[r][c] = {
         opened: false,
-        value: 'unknown',  // 'gold' или 'common'
-        hint: 'unknown'    // 'gold' или 'common'
+        value: 'unknown',
+        hint: 'unknown'
       };
     }
   }
@@ -502,7 +499,6 @@ function buildBoardUI() {
 }
 buildBoardUI();
 
-// -------------------- Элементы интерфейса --------------------
 const panel = document.getElementById('panel');
 const panelTile = document.getElementById('panel-tile');
 const saveBtn = document.getElementById('save-btn');
@@ -517,28 +513,23 @@ resetBtn.addEventListener('click', resetGame);
 
 let currentEdit = null;
 
-// -------------------- Функции для очистки плиток --------------------
 function clearCurrentTile() {
   if (!currentEdit) return;
   
   const r = currentEdit.r;
   const c = currentEdit.c;
   
-  // Сбрасываем данные плитки
   tileData[r][c] = {
     opened: false,
     value: 'unknown',
     hint: 'unknown'
   };
   
-  // Обновляем UI
   updateTileUI(r, c);
   
-  // Закрываем панель
   panel.classList.add('hidden');
   currentEdit = null;
   
-  // Пересчитываем подсказки
   runSolverAndSuggest();
 }
 
@@ -547,7 +538,6 @@ function closePanelWithoutSaving() {
   currentEdit = null;
 }
 
-// -------------------- Классы и логика решателя --------------------
 const Category = { SPECIAL: 'gold', COMMON: 'common' };
 
 class Tile {
@@ -556,7 +546,7 @@ class Tile {
     this.col = col;
     this.opened = false;
     this.category = Category.COMMON;
-    this.neighborHint = "Common"; // "Gold" или "Common"
+    this.neighborHint = "Common";
   }
 }
 
@@ -798,7 +788,6 @@ class BruteforceProbabilitySolver {
   }
 }
 
-// -------------------- Интеграция решателя с интерфейсом --------------------
 function openPanel(r, c) {
   currentEdit = {r, c};
   panel.classList.remove('hidden');
@@ -844,14 +833,12 @@ function updateTileUI(r,c) {
   const idx = r * cols + c;
   const tileEl = boardEl.children[idx];
   
-  // Сбрасываем состояние плитки
   tileEl.classList.remove('opened', 'gold-tile', 'suggested');
   tileEl.textContent = '?';
   
   const oldIcon = tileEl.querySelector('.hint-icon');
   if (oldIcon) oldIcon.remove();
 
-  // Если плитка открыта, показываем её содержимое
   if (tileData[r][c].opened) {
     tileEl.classList.add('opened');
     if (tileData[r][c].value === 'gold') {
@@ -917,7 +904,6 @@ function showSuggestion(nextTile) {
 }
 
 function resetGame() {
-  // Убрано подтверждение
   initializeTileData();
   buildBoardUI();
   panel.classList.add('hidden');
@@ -925,7 +911,6 @@ function resetGame() {
   runSolverAndSuggest();
 }
 
-// Начальная подсказка
 runSolverAndSuggest();
 </script>
 </body>
