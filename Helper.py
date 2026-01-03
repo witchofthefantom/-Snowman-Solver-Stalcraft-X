@@ -52,7 +52,6 @@ class Grid:
         self.tiles: List[Tile] = []
         self.golds_found = 0
         
-        # Инициализация плиток
         for r in range(rows):
             for c in range(cols):
                 self.tiles.append(Tile(r, c))
@@ -101,18 +100,15 @@ class BruteforceProbabilitySolver:
     def __init__(self, grid: Grid):
         self.grid = grid
         
-        # Подготовка данных для быстрого доступа
         self.num_tiles = len(grid.tiles)
         self.possible_configurations = self._get_possible_configurations(TOTAL_GOLD, self.num_tiles)
         self.possible_configurations_remaining = len(self.possible_configurations)
         
-        # Индексы соседей для каждой плитки
         self.neighbors_index = []
         for i, tile in enumerate(grid.tiles):
             neighbors = grid.get_neighbors(tile)
             self.neighbors_index.append([self._get_tile_index(nt) for nt in neighbors])
         
-        # Статистика
         self.configurations_per_gold_tile = [0] * self.num_tiles
         self.configurations_per_gold_hint_tile = [0] * self.num_tiles
         self.remaining_configs_after_open_estimate = [0] * self.num_tiles
@@ -122,9 +118,7 @@ class BruteforceProbabilitySolver:
         return tile.col + tile.row * self.grid.cols
     
     def _get_possible_configurations(self, golds: int, num_tiles: int) -> List[int]:
-        """Генерация всех возможных комбинаций золотых плиток"""
         configurations = []
-        # Генерируем все комбинации из 4 золотых плиток на 30 позициях
         for p1 in range(num_tiles):
             for p2 in range(p1 + 1, num_tiles):
                 for p3 in range(p2 + 1, num_tiles):
@@ -134,30 +128,24 @@ class BruteforceProbabilitySolver:
         return configurations
     
     def _is_gold_in_configuration(self, configuration: int, tile_index: int) -> bool:
-        """Проверить, есть ли плитка в конфигурации"""
         return ((configuration & 0xFF) == tile_index or
                 ((configuration >> 8) & 0xFF) == tile_index or
                 ((configuration >> 16) & 0xFF) == tile_index or
                 ((configuration >> 24) & 0xFF) == tile_index)
     
     def _remove_configuration(self, index: int):
-        """Удалить конфигурацию по индексу"""
         self.possible_configurations[index] = self.possible_configurations[self.possible_configurations_remaining - 1]
         self.possible_configurations_remaining -= 1
     
     def update_possible_configurations(self):
-        """Обновить возможные конфигурации на основе открытых плиток"""
-        # Начинаем со всех возможных конфигураций
         self.possible_configurations = self._get_possible_configurations(TOTAL_GOLD, self.num_tiles)
         self.possible_configurations_remaining = len(self.possible_configurations)
         
-        # Фильтруем по открытым плиткам
         for tile in self.grid.tiles:
             if tile.opened:
                 self._narrow_down_configurations(tile)
     
     def _narrow_down_configurations(self, open_tile: Tile):
-        """Сужение конфигураций на основе информации о плитке"""
         is_gold = open_tile.category == Category.GOLD
         is_gold_hint = open_tile.neighbor_hint == HintType.GOLD
         tile_index = self._get_tile_index(open_tile)
@@ -166,18 +154,15 @@ class BruteforceProbabilitySolver:
         while i < self.possible_configurations_remaining:
             config = self.possible_configurations[i]
             
-            # Проверяем соответствие типа плитки
             if is_gold != self._is_gold_in_configuration(config, tile_index):
                 self._remove_configuration(i)
                 continue
             
-            # Проверяем соответствие подсказки о соседях
             if is_gold_hint:
                 if not self._has_gold_neighbors(tile_index, config):
                     self._remove_configuration(i)
                     continue
             else:
-                # Если нет золотых соседей, проверяем всех соседей
                 remove = False
                 for neighbor_idx in self.neighbors_index[tile_index]:
                     if self._is_gold_in_configuration(config, neighbor_idx):
@@ -190,23 +175,18 @@ class BruteforceProbabilitySolver:
             i += 1
     
     def _has_gold_neighbors(self, tile_index: int, configuration: int) -> bool:
-        """Проверить, есть ли у плитки золотые соседи"""
         for neighbor_idx in self.neighbors_index[tile_index]:
             if self._is_gold_in_configuration(configuration, neighbor_idx):
                 return True
         return False
     
     def update_probabilities(self):
-        """Обновить вероятности для всех плиток"""
-        # Сброс статистики
         self.configurations_per_gold_tile = [0] * self.num_tiles
         self.configurations_per_gold_hint_tile = [0] * self.num_tiles
         
-        # Подсчет статистики по всем конфигурациям
         for i in range(self.possible_configurations_remaining):
             config = self.possible_configurations[i]
             
-            # Извлекаем индексы золотых плиток
             gold_indices = [
                 config & 0xFF,
                 (config >> 8) & 0xFF,
@@ -214,29 +194,24 @@ class BruteforceProbabilitySolver:
                 (config >> 24) & 0xFF
             ]
             
-            # Подсчитываем золотые плитки
             for gi in gold_indices:
                 self.configurations_per_gold_tile[gi] += 1
             
-            # Подсчитываем плитки с золотыми соседями
             gold_hint_bits = 0
             for gi in gold_indices:
                 for neighbor_idx in self.neighbors_index[gi]:
                     gold_hint_bits |= (1 << neighbor_idx)
             
-            # Для каждой плитки проверяем, есть ли она в gold_hint_bits
             for tile_idx in range(self.num_tiles):
                 if (gold_hint_bits >> tile_idx) & 1:
                     self.configurations_per_gold_hint_tile[tile_idx] += 1
     
     def update_remaining_configs_estimate(self):
-        """Оценить оставшиеся конфигурации после открытия каждой плитки"""
         for tile in self.grid.tiles:
             tile_idx = self._get_tile_index(tile)
             self.remaining_configs_after_open_estimate[tile_idx] = self._calc_remaining_configs_estimate(tile)
     
     def _calc_remaining_configs_estimate(self, tile: Tile) -> float:
-        """Вычислить оценку оставшихся конфигураций"""
         tile_idx = self._get_tile_index(tile)
         
         if self.possible_configurations_remaining == 0:
@@ -247,7 +222,6 @@ class BruteforceProbabilitySolver:
         
         weighted_avg = 0.0
         
-        # Все 4 комбинации: (gold?, gold_hint?)
         for is_gold, is_gold_hint in [(False, False), (False, True), (True, False), (True, True)]:
             prob_scenario = (1.0 - gold_prob if not is_gold else gold_prob) * \
                            (1.0 - gold_hint_prob if not is_gold_hint else gold_hint_prob)
@@ -257,18 +231,15 @@ class BruteforceProbabilitySolver:
         return weighted_avg
     
     def _get_configs_after_open(self, tile: Tile, is_gold: bool, is_gold_hint: bool) -> int:
-        """Подсчитать конфигурации после открытия плитки с заданными параметрами"""
         tile_idx = self._get_tile_index(tile)
         remaining = 0
         
         for i in range(self.possible_configurations_remaining):
             config = self.possible_configurations[i]
             
-            # Проверяем соответствие типа плитки
             if is_gold != self._is_gold_in_configuration(config, tile_idx):
                 continue
             
-            # Проверяем соответствие подсказки о соседях
             if is_gold_hint:
                 if not self._has_gold_neighbors(tile_idx, config):
                     continue
@@ -286,7 +257,6 @@ class BruteforceProbabilitySolver:
         return remaining
     
     def get_tile_priority(self, tile: Tile) -> float:
-        """Получить приоритет плитки для открытия"""
         tile_idx = self._get_tile_index(tile)
         
         if self.possible_configurations_remaining == 0:
@@ -296,22 +266,18 @@ class BruteforceProbabilitySolver:
         excluded_share = 1.0 - (self.remaining_configs_after_open_estimate[tile_idx] / 
                                self.possible_configurations_remaining)
         
-        # Формула приоритета (чем больше, тем лучше открывать)
         return 1.0 - ((1.0 - gold_prob) * (1.0 - excluded_share) ** 2)
     
     def get_next_tile_to_open(self) -> Tile:
-        """Получить следующую плитку для открытия"""
         unopened_tiles = [t for t in self.grid.tiles if not t.opened]
         
         if not unopened_tiles:
             return None
         
-        # Сортируем по приоритету
         unopened_tiles.sort(key=lambda t: self.get_tile_priority(t), reverse=True)
         return unopened_tiles[0]
 
 class SnowmanSolverApp:
-    """Главное приложение"""
     
     def __init__(self, root):
         self.root = root
@@ -320,22 +286,19 @@ class SnowmanSolverApp:
         self.root.configure(bg='#0f0f0f')
         self.root.resizable(False, False)
         
-        # Определяем лучшие шрифты для эмодзи
         self.emoji_font = self.get_emoji_font()
         
-        # Инициализация данных
         self.tile_data = self._initialize_tile_data()
         self.current_edit = None
         self.suggested_tile = None
         
-        # Современный тёмный дизайн
         self.colors = {
             'bg': '#0f0f0f',
             'card_bg': '#1e1e1e',
             'text': '#ffffff',
             'text_secondary': '#b0b0b0',
-            'accent': '#4a90e2',  # Синий для выбранных плиток
-            'selection': '#ff6b6b',  # КРАСНЫЙ для выбора в Tile Info
+            'accent': '#4a90e2',
+            'selection': '#ff6b6b',
             'gold': '#ffd700',
             'success': '#2ecc71',
             'warning': '#e74c3c',
@@ -343,20 +306,16 @@ class SnowmanSolverApp:
             'tile_opened': '#3a3a3a',
             'border': '#404040',
             'hover': '#4a4a4a',
-            'suggestion': '#ff4444'  # Красный для подсказки
+            'suggestion': '#ff4444'
         }
         
-        # Создание интерфейса
         self.create_widgets()
-        
-        # Обновление подсказки
+
         self.update_suggestion()
-        
-        # Привязка горячих клавиш
+
         self.setup_keyboard_shortcuts()
     
     def get_emoji_font(self):
-        """Получить лучший шрифт для эмодзи"""
         system = platform.system()
         available_fonts = font.families()
         
@@ -378,7 +337,6 @@ class SnowmanSolverApp:
         return "Arial"
     
     def _initialize_tile_data(self) -> List[List[TileData]]:
-        """Инициализация данных плиток"""
         data = []
         for r in range(ROWS):
             row = []
@@ -388,12 +346,9 @@ class SnowmanSolverApp:
         return data
     
     def create_widgets(self):
-        """Создание виджетов интерфейса"""
-        # Главный контейнер
         self.main_container = tk.Frame(self.root, bg=self.colors['bg'])
         self.main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
-        # Заголовок
         title_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
         title_frame.pack(fill=tk.X, pady=(0, 20))
         
@@ -406,24 +361,19 @@ class SnowmanSolverApp:
         )
         title_label.pack()
         
-        
-        # Основной контент
+
         content_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
         content_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Левая часть - игровое поле
         left_panel = tk.Frame(content_frame, bg=self.colors['bg'])
         left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 15))
         
-        # Контейнер для сетки с фиксированным размером
         board_container = tk.Frame(left_panel, bg=self.colors['bg'])
         board_container.pack(expand=True)
         
-        # Сетка плиток
         board_frame = tk.Frame(board_container, bg=self.colors['bg'])
         board_frame.pack()
         
-        # Создание плиток с фиксированным размером
         self.tile_buttons = []
         for r in range(ROWS):
             for c in range(COLS):
@@ -443,13 +393,11 @@ class SnowmanSolverApp:
                 )
                 btn.grid(row=r, column=c, padx=4, pady=4)
                 
-                # Эффект при наведении
                 btn.bind("<Enter>", lambda e, b=btn: b.config(bg=self.colors['hover']))
                 btn.bind("<Leave>", lambda e, b=btn, row=r, col=c: self.update_button_style(b, row, col))
                 
                 self.tile_buttons.append(btn)
-        
-        # Правая часть - панель информации
+
         right_panel = tk.Frame(
             content_frame, 
             bg=self.colors['card_bg'],
@@ -460,11 +408,9 @@ class SnowmanSolverApp:
         )
         right_panel.pack(side=tk.RIGHT, fill=tk.Y, padx=(15, 0))
         
-        # Содержимое панели
         panel_content = tk.Frame(right_panel, bg=self.colors['card_bg'], padx=15, pady=15)
         panel_content.pack(fill=tk.BOTH, expand=True)
         
-        # Заголовок панели
         panel_title = tk.Label(
             panel_content,
             text="📝 Информация о плитке",
@@ -474,7 +420,6 @@ class SnowmanSolverApp:
         )
         panel_title.pack(pady=(0, 15))
         
-        # Координаты плитки
         self.panel_coords = tk.Label(
             panel_content,
             text="Плитка не выбрана",
@@ -484,7 +429,6 @@ class SnowmanSolverApp:
         )
         self.panel_coords.pack(pady=(0, 20))
         
-        # Тип плитки
         type_label = tk.Label(
             panel_content,
             text="Тип плитки:",
@@ -527,7 +471,6 @@ class SnowmanSolverApp:
             cursor="hand2"
         ).pack(side=tk.LEFT)
         
-        # Подсказка о соседях
         hint_label = tk.Label(
             panel_content,
             text="Подсказка о соседях:",
@@ -549,7 +492,7 @@ class SnowmanSolverApp:
             value="gold",
             bg=self.colors['card_bg'],
             fg=self.colors['text'],
-            selectcolor=self.colors['selection'],  # КРАСНЫЙ выбор
+            selectcolor=self.colors['selection'],
             activebackground=self.colors['card_bg'],
             activeforeground=self.colors['text'],
             font=("Arial", 10),
@@ -563,18 +506,16 @@ class SnowmanSolverApp:
             value="common",
             bg=self.colors['card_bg'],
             fg=self.colors['text'],
-            selectcolor=self.colors['selection'],  # КРАСНЫЙ выбор
+            selectcolor=self.colors['selection'],
             activebackground=self.colors['card_bg'],
             activeforeground=self.colors['text'],
             font=("Arial", 10),
             cursor="hand2"
         ).pack(side=tk.LEFT)
         
-        # Кнопки панели
         button_frame = tk.Frame(panel_content, bg=self.colors['card_bg'])
         button_frame.pack(fill=tk.X, pady=(10, 0))
         
-        # Кнопка Сохранить
         self.save_btn = tk.Button(
             button_frame,
             text="💾 Сохранить",
@@ -591,7 +532,6 @@ class SnowmanSolverApp:
         )
         self.save_btn.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
         
-        # Кнопка Очистить
         self.clear_btn = tk.Button(
             button_frame,
             text="🗑️ Очистить",
@@ -608,7 +548,6 @@ class SnowmanSolverApp:
         )
         self.clear_btn.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
         
-        # Подсказка следующей плитки
         suggestion_frame = tk.Frame(
             self.main_container,
             bg=self.colors['card_bg'],
@@ -640,7 +579,6 @@ class SnowmanSolverApp:
         )
         self.suggestion_text.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Кнопка сброса
         reset_btn = tk.Button(
             self.main_container,
             text="🔄 Начать заново",
@@ -657,7 +595,6 @@ class SnowmanSolverApp:
         reset_btn.pack(pady=(15, 0))
     
     def update_button_style(self, button, row, col):
-        """Обновить стиль кнопки при уходе мыши"""
         data = self.tile_data[row][col]
         index = row * COLS + col
         
@@ -674,7 +611,6 @@ class SnowmanSolverApp:
             button.config(bg=self.colors['tile_closed'])
     
     def select_tile(self, row: int, col: int):
-        """Выбрать плитку для редактирования"""
         self.current_edit = (row, col)
         self.panel_coords.config(text=f"Строка: {row+1}, Колонка: {col+1}")
         
@@ -689,11 +625,9 @@ class SnowmanSolverApp:
         self.save_btn.config(state=tk.NORMAL)
         self.clear_btn.config(state=tk.NORMAL)
         
-        # Обновляем выделение
         self.update_tile_selection(row, col)
     
     def update_tile_selection(self, row: int, col: int):
-        """Обновить выделение выбранной плитки"""
         for i, btn in enumerate(self.tile_buttons):
             r = i // COLS
             c = i % COLS
@@ -702,7 +636,7 @@ class SnowmanSolverApp:
             if self.suggested_tile and r == self.suggested_tile.row and c == self.suggested_tile.col:
                 btn.config(bg=self.colors['suggestion'])
             elif r == row and c == col:
-                btn.config(bg=self.colors['selection'])  # КРАСНЫЙ для выбранной плитки
+                btn.config(bg=self.colors['selection'])
             elif data.opened:
                 if data.value == 'gold':
                     btn.config(bg=self.colors['gold'])
@@ -712,7 +646,6 @@ class SnowmanSolverApp:
                 btn.config(bg=self.colors['tile_closed'])
     
     def save_tile_info(self):
-        """Сохранить информацию о плитке"""
         if not self.current_edit:
             return
         
@@ -725,7 +658,6 @@ class SnowmanSolverApp:
         self.update_suggestion()
     
     def clear_current_tile(self):
-        """Очистить текущую плитку"""
         if not self.current_edit:
             return
         
@@ -739,7 +671,6 @@ class SnowmanSolverApp:
         self.hint_type_var.set("common")
     
     def update_tile_ui(self, row: int, col: int):
-        """Обновить отображение плитки"""
         index = row * COLS + col
         btn = self.tile_buttons[index]
         data = self.tile_data[row][col]
@@ -755,14 +686,12 @@ class SnowmanSolverApp:
         else:
             btn.config(text="?", bg=self.colors['tile_closed'], fg=self.colors['text'])
         
-        # Обновляем выделение
         if self.current_edit and row == self.current_edit[0] and col == self.current_edit[1]:
             btn.config(bg=self.colors['selection'])
         elif self.suggested_tile and row == self.suggested_tile.row and col == self.suggested_tile.col:
             btn.config(bg=self.colors['suggestion'])
     
     def update_suggestion(self):
-        """Обновить подсказку"""
         grid = Grid(ROWS, COLS, TOTAL_GOLD)
         grid.init_from_tile_data(self.tile_data)
         
@@ -788,7 +717,6 @@ class SnowmanSolverApp:
         self.show_suggestion(next_tile)
     
     def show_suggestion(self, next_tile):
-        """Показать подсказку"""
         self.suggested_tile = next_tile
         
         if not next_tile:
@@ -800,11 +728,9 @@ class SnowmanSolverApp:
             text=f"Откройте плитку в Строке {next_tile.row+1}, Колонке {next_tile.col+1}"
         )
         
-        # Подсвечиваем предложенную плитку
         self.update_tile_selection(-1, -1)
     
     def reset_game(self):
-        """Сбросить игру"""
         self.tile_data = self._initialize_tile_data()
         for r in range(ROWS):
             for c in range(COLS):
@@ -821,12 +747,10 @@ class SnowmanSolverApp:
         self.update_suggestion()
     
     def setup_keyboard_shortcuts(self):
-        """Настройка горячих клавиш"""
         self.root.bind('<Escape>', lambda e: self.reset_game())
         self.root.bind('<Control-r>', lambda e: self.reset_game())
 
 def main():
-    """Точка входа в приложение"""
     root = tk.Tk()
     app = SnowmanSolverApp(root)
     
