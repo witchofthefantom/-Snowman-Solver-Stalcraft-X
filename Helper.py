@@ -10,7 +10,7 @@ import math
 ROWS = 5
 COLS = 6
 TOTAL_GOLD = 4
-WINDOW_WIDTH = 850
+WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 
 # Enum для категорий плиток
@@ -317,16 +317,34 @@ class SnowmanSolverApp:
         self.root = root
         self.root.title("Snowman Solver - Решатель головоломки")
         self.root.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-        self.root.configure(bg='#1a1a1a')
+        self.root.configure(bg='#0f0f0f')
         self.root.resizable(False, False)
         
         # Определяем лучшие шрифты для эмодзи
         self.emoji_font = self.get_emoji_font()
-        self.ui_font = "Arial"  # Основной шрифт для текста
         
         # Инициализация данных
         self.tile_data = self._initialize_tile_data()
         self.current_edit = None
+        self.suggested_tile = None
+        
+        # Современный тёмный дизайн
+        self.colors = {
+            'bg': '#0f0f0f',
+            'card_bg': '#1e1e1e',
+            'text': '#ffffff',
+            'text_secondary': '#b0b0b0',
+            'accent': '#4a90e2',  # Синий для выбранных плиток
+            'selection': '#ff6b6b',  # КРАСНЫЙ для выбора в Tile Info
+            'gold': '#ffd700',
+            'success': '#2ecc71',
+            'warning': '#e74c3c',
+            'tile_closed': '#2d2d2d',
+            'tile_opened': '#3a3a3a',
+            'border': '#404040',
+            'hover': '#4a4a4a',
+            'suggestion': '#ff4444'  # Красный для подсказки
+        }
         
         # Создание интерфейса
         self.create_widgets()
@@ -342,24 +360,21 @@ class SnowmanSolverApp:
         system = platform.system()
         available_fonts = font.families()
         
-        # Приоритетный список шрифтов с поддержкой эмодзи
         emoji_font_candidates = [
-            "Segoe UI Emoji",      # Windows 10/11
-            "Segoe UI Symbol",     # Windows 8/10
-            "Apple Color Emoji",   # macOS
-            "Noto Color Emoji",    # Linux (часто устанавливается)
-            "Symbola",            # Кроссплатформенный
-            "DejaVu Sans",        # Хорошая поддержка Unicode
-            "Arial Unicode MS",   # Windows
-            "Arial"               # Запасной вариант
+            "Segoe UI Emoji",
+            "Segoe UI Symbol",
+            "Apple Color Emoji",
+            "Noto Color Emoji",
+            "Symbola",
+            "DejaVu Sans",
+            "Arial Unicode MS",
+            "Arial"
         ]
         
         for font_name in emoji_font_candidates:
             if font_name in available_fonts:
-                print(f"Используем шрифт для эмодзи: {font_name}")
                 return font_name
         
-        print("Используем Arial (специальный шрифт для эмодзи не найден)")
         return "Arial"
     
     def _initialize_tile_data(self) -> List[List[TileData]]:
@@ -375,246 +390,294 @@ class SnowmanSolverApp:
     def create_widgets(self):
         """Создание виджетов интерфейса"""
         # Главный контейнер
-        self.main_container = tk.Frame(self.root, bg='#1a1a1a')
-        self.main_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=15)
+        self.main_container = tk.Frame(self.root, bg=self.colors['bg'])
+        self.main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
         
         # Заголовок
-        title_frame = tk.Frame(self.main_container, bg='#1a1a1a')
-        title_frame.pack(fill=tk.X, pady=(0, 15))
+        title_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
+        title_frame.pack(fill=tk.X, pady=(0, 20))
         
         title_label = tk.Label(
             title_frame,
-            text="❄️ Snowman Solver - Решатель головоломки",
-            font=(self.emoji_font, 20, "bold"),
-            bg='#1a1a1a',
-            fg='#e0e0e0'
+            text="🔍 Snowman Solver - Решатель головоломки",
+            font=(self.emoji_font, 22, "bold"),
+            bg=self.colors['bg'],
+            fg=self.colors['accent']
         )
         title_label.pack()
         
-        # Контейнер для поля и панели
-        self.container = tk.Frame(self.main_container, bg='#1a1a1a')
-        self.container.pack(fill=tk.BOTH, expand=True)
         
-        # Игровое поле (слева)
-        board_frame = tk.Frame(self.container, bg='#1a1a1a')
-        board_frame.pack(side=tk.LEFT, padx=(0, 20))
+        # Основной контент
+        content_frame = tk.Frame(self.main_container, bg=self.colors['bg'])
+        content_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Создание плиток
+        # Левая часть - игровое поле
+        left_panel = tk.Frame(content_frame, bg=self.colors['bg'])
+        left_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 15))
+        
+        # Контейнер для сетки с фиксированным размером
+        board_container = tk.Frame(left_panel, bg=self.colors['bg'])
+        board_container.pack(expand=True)
+        
+        # Сетка плиток
+        board_frame = tk.Frame(board_container, bg=self.colors['bg'])
+        board_frame.pack()
+        
+        # Создание плиток с фиксированным размером
         self.tile_buttons = []
         for r in range(ROWS):
             for c in range(COLS):
-                btn = tk.Label(
+                btn = tk.Button(
                     board_frame,
                     text="?",
-                    font=(self.emoji_font, 14, "bold"),
+                    font=(self.emoji_font, 16, "bold"),
                     width=3,
                     height=1,
-                    bg='#555555',
-                    fg='#e0e0e0',
-                    relief=tk.RAISED,
-                    borderwidth=2,
-                    cursor="hand2"
+                    bg=self.colors['tile_closed'],
+                    fg=self.colors['text'],
+                    relief=tk.FLAT,
+                    bd=0,
+                    cursor="hand2",
+                    command=lambda row=r, col=c: self.select_tile(row, col),
+                    activebackground=self.colors['hover']
                 )
-                btn.grid(row=r, column=c, padx=2, pady=2)
-                btn.bind('<Button-1>', lambda e, row=r, col=c: self.select_tile(row, col))
+                btn.grid(row=r, column=c, padx=4, pady=4)
+                
+                # Эффект при наведении
+                btn.bind("<Enter>", lambda e, b=btn: b.config(bg=self.colors['hover']))
+                btn.bind("<Leave>", lambda e, b=btn, row=r, col=c: self.update_button_style(b, row, col))
+                
                 self.tile_buttons.append(btn)
         
-        # Панель информации (справа) - компактная
-        self.panel_frame = tk.Frame(
-            self.container, 
-            bg='#2d2d2d', 
-            relief=tk.RIDGE, 
-            borderwidth=1,
-            width=220,  # Уменьшенная ширина
-            height=320  # Уменьшенная высота
+        # Правая часть - панель информации
+        right_panel = tk.Frame(
+            content_frame, 
+            bg=self.colors['card_bg'],
+            relief=tk.FLAT,
+            bd=1,
+            highlightbackground=self.colors['border'],
+            highlightthickness=1
         )
-        self.panel_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-        self.panel_frame.pack_propagate(False)
+        right_panel.pack(side=tk.RIGHT, fill=tk.Y, padx=(15, 0))
         
         # Содержимое панели
-        panel_content = tk.Frame(self.panel_frame, bg='#2d2d2d', padx=12, pady=12)
+        panel_content = tk.Frame(right_panel, bg=self.colors['card_bg'], padx=15, pady=15)
         panel_content.pack(fill=tk.BOTH, expand=True)
         
         # Заголовок панели
         panel_title = tk.Label(
             panel_content,
             text="📝 Информация о плитке",
-            font=(self.emoji_font, 12, "bold"),
-            bg='#2d2d2d',
-            fg='#e0e0e0'
+            font=(self.emoji_font, 14, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text']
         )
-        panel_title.pack(pady=(0, 10))
+        panel_title.pack(pady=(0, 15))
         
         # Координаты плитки
         self.panel_coords = tk.Label(
             panel_content,
-            text="Не выбрана",
-            font=(self.ui_font, 10),
-            bg='#2d2d2d',
-            fg='#e0e0e0'
+            text="Плитка не выбрана",
+            font=("Arial", 10),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_secondary']
         )
-        self.panel_coords.pack(pady=(0, 12))
+        self.panel_coords.pack(pady=(0, 20))
         
         # Тип плитки
-        type_frame = tk.LabelFrame(
+        type_label = tk.Label(
             panel_content,
             text="Тип плитки:",
-            bg='#2d2d2d',
-            fg='#e0e0e0',
-            font=(self.ui_font, 9, "bold")
+            font=("Arial", 10, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text']
         )
-        type_frame.pack(fill=tk.X, pady=(0, 10))
+        type_label.pack(anchor=tk.W, pady=(0, 5))
+        
+        type_frame = tk.Frame(panel_content, bg=self.colors['card_bg'])
+        type_frame.pack(fill=tk.X, pady=(0, 15))
         
         self.tile_type_var = tk.StringVar(value="common")
         
         tk.Radiobutton(
             type_frame,
-            text="🥇 Золотая",
+            text=" 🥇 Золотая",
             variable=self.tile_type_var,
             value="gold",
-            bg='#2d2d2d',
-            fg='#e0e0e0',
-            selectcolor='#3d3d3d',
-            activebackground='#2d2d2d',
-            activeforeground='#e0e0e0',
-            font=(self.emoji_font, 9),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text'],
+            selectcolor=self.colors['selection'],  # КРАСНЫЙ выбор
+            activebackground=self.colors['card_bg'],
+            activeforeground=self.colors['text'],
+            font=(self.emoji_font, 10),
             cursor="hand2"
-        ).pack(anchor=tk.W, pady=2, padx=8)
+        ).pack(side=tk.LEFT, padx=(0, 10))
         
         tk.Radiobutton(
             type_frame,
-            text="🟫 Обычная",
+            text=" □ Обычная",
             variable=self.tile_type_var,
             value="common",
-            bg='#2d2d2d',
-            fg='#e0e0e0',
-            selectcolor='#3d3d3d',
-            activebackground='#2d2d2d',
-            activeforeground='#e0e0e0',
-            font=(self.emoji_font, 9),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text'],
+            selectcolor=self.colors['selection'],  # КРАСНЫЙ выбор
+            activebackground=self.colors['card_bg'],
+            activeforeground=self.colors['text'],
+            font=("Arial", 10),
             cursor="hand2"
-        ).pack(anchor=tk.W, pady=2, padx=8)
+        ).pack(side=tk.LEFT)
         
         # Подсказка о соседях
-        hint_frame = tk.LabelFrame(
+        hint_label = tk.Label(
             panel_content,
             text="Подсказка о соседях:",
-            bg='#2d2d2d',
-            fg='#e0e0e0',
-            font=(self.ui_font, 9, "bold")
+            font=("Arial", 10, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text']
         )
-        hint_frame.pack(fill=tk.X, pady=(0, 15))
+        hint_label.pack(anchor=tk.W, pady=(0, 5))
+        
+        hint_frame = tk.Frame(panel_content, bg=self.colors['card_bg'])
+        hint_frame.pack(fill=tk.X, pady=(0, 20))
         
         self.hint_type_var = tk.StringVar(value="common")
         
         tk.Radiobutton(
             hint_frame,
-            text="⭐ Есть золотой сосед",
+            text=" Есть золотой сосед",
             variable=self.hint_type_var,
             value="gold",
-            bg='#2d2d2d',
-            fg='#e0e0e0',
-            selectcolor='#3d3d3d',
-            activebackground='#2d2d2d',
-            activeforeground='#e0e0e0',
-            font=(self.emoji_font, 9),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text'],
+            selectcolor=self.colors['selection'],  # КРАСНЫЙ выбор
+            activebackground=self.colors['card_bg'],
+            activeforeground=self.colors['text'],
+            font=("Arial", 10),
             cursor="hand2"
-        ).pack(anchor=tk.W, pady=2, padx=8)
+        ).pack(side=tk.LEFT, padx=(0, 10))
         
         tk.Radiobutton(
             hint_frame,
-            text="🚫 Нет золотых соседей",
+            text=" Нет золотых соседей",
             variable=self.hint_type_var,
             value="common",
-            bg='#2d2d2d',
-            fg='#e0e0e0',
-            selectcolor='#3d3d3d',
-            activebackground='#2d2d2d',
-            activeforeground='#e0e0e0',
-            font=(self.emoji_font, 9),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text'],
+            selectcolor=self.colors['selection'],  # КРАСНЫЙ выбор
+            activebackground=self.colors['card_bg'],
+            activeforeground=self.colors['text'],
+            font=("Arial", 10),
             cursor="hand2"
-        ).pack(anchor=tk.W, pady=2, padx=8)
+        ).pack(side=tk.LEFT)
         
-        # Кнопки панели (компактные)
-        button_frame = tk.Frame(panel_content, bg='#2d2d2d')
-        button_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=(10, 0))
+        # Кнопки панели
+        button_frame = tk.Frame(panel_content, bg=self.colors['card_bg'])
+        button_frame.pack(fill=tk.X, pady=(10, 0))
         
         # Кнопка Сохранить
         self.save_btn = tk.Button(
             button_frame,
             text="💾 Сохранить",
             command=self.save_tile_info,
-            bg='#45a049',
+            bg=self.colors['success'],
             fg='white',
-            font=(self.emoji_font, 9, "bold"),
-            padx=8,
-            pady=4,
+            font=(self.emoji_font, 10, "bold"),
+            padx=15,
+            pady=8,
             cursor="hand2",
-            state=tk.DISABLED
+            state=tk.DISABLED,
+            relief=tk.FLAT,
+            bd=0
         )
         self.save_btn.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
         
         # Кнопка Очистить
         self.clear_btn = tk.Button(
             button_frame,
-            text="🧹 Очистить",
+            text="🗑️ Очистить",
             command=self.clear_current_tile,
-            bg='#ff9800',
+            bg=self.colors['warning'],
             fg='white',
-            font=(self.emoji_font, 9, "bold"),
-            padx=8,
-            pady=4,
+            font=(self.emoji_font, 10, "bold"),
+            padx=15,
+            pady=8,
             cursor="hand2",
-            state=tk.DISABLED
+            state=tk.DISABLED,
+            relief=tk.FLAT,
+            bd=0
         )
         self.clear_btn.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
         
-        # Кнопка Отмена
-        self.cancel_btn = tk.Button(
-            button_frame,
-            text="❌ Отмена",
-            command=self.cancel_selection,
-            bg='#666666',
-            fg='white',
-            font=(self.emoji_font, 9, "bold"),
-            padx=8,
-            pady=4,
-            cursor="hand2",
-            state=tk.DISABLED
+        # Подсказка следующей плитки
+        suggestion_frame = tk.Frame(
+            self.main_container,
+            bg=self.colors['card_bg'],
+            relief=tk.FLAT,
+            bd=1,
+            highlightbackground=self.colors['border'],
+            highlightthickness=1
         )
-        self.cancel_btn.pack(side=tk.LEFT, padx=2, fill=tk.X, expand=True)
+        suggestion_frame.pack(fill=tk.X, pady=(15, 0))
         
-        # Кнопка сброса (под панелью)
+        suggestion_content = tk.Frame(suggestion_frame, bg=self.colors['card_bg'], padx=15, pady=10)
+        suggestion_content.pack(fill=tk.X)
+        
+        suggestion_label = tk.Label(
+            suggestion_content,
+            text="🎯 Следующая подсказка:",
+            font=(self.emoji_font, 11, "bold"),
+            bg=self.colors['card_bg'],
+            fg=self.colors['accent']
+        )
+        suggestion_label.pack(side=tk.LEFT)
+        
+        self.suggestion_text = tk.Label(
+            suggestion_content,
+            text="Выберите плитки для получения подсказок",
+            font=("Arial", 10),
+            bg=self.colors['card_bg'],
+            fg=self.colors['text_secondary']
+        )
+        self.suggestion_text.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Кнопка сброса
         reset_btn = tk.Button(
             self.main_container,
             text="🔄 Начать заново",
             command=self.reset_game,
-            bg='#45a049',
+            bg=self.colors['accent'],
             fg='white',
             font=(self.emoji_font, 10, "bold"),
-            padx=15,
-            pady=6,
-            cursor="hand2"
+            padx=25,
+            pady=10,
+            cursor="hand2",
+            relief=tk.FLAT,
+            bd=0
         )
-        reset_btn.pack(side=tk.BOTTOM, pady=(10, 5))
+        reset_btn.pack(pady=(15, 0))
+    
+    def update_button_style(self, button, row, col):
+        """Обновить стиль кнопки при уходе мыши"""
+        data = self.tile_data[row][col]
+        index = row * COLS + col
         
-        # Информационная метка (в самом низу)
-        self.info_label = tk.Label(
-            self.main_container,
-            text="",
-            font=(self.emoji_font, 10),
-            bg='#1a1a1a',
-            fg='#e0e0e0',
-            pady=5
-        )
-        self.info_label.pack(side=tk.BOTTOM, fill=tk.X)
+        if self.suggested_tile and row == self.suggested_tile.row and col == self.suggested_tile.col:
+            button.config(bg=self.colors['suggestion'])  # Красный для подсказки
+        elif self.current_edit and row == self.current_edit[0] and col == self.current_edit[1]:
+            button.config(bg=self.colors['selection'])  # КРАСНЫЙ для выбранной плитки
+        elif data.opened:
+            if data.value == 'gold':
+                button.config(bg=self.colors['gold'])
+            else:
+                button.config(bg=self.colors['tile_opened'])
+        else:
+            button.config(bg=self.colors['tile_closed'])
     
     def select_tile(self, row: int, col: int):
         """Выбрать плитку для редактирования"""
         self.current_edit = (row, col)
         self.panel_coords.config(text=f"Строка: {row+1}, Колонка: {col+1}")
         
-        # Устанавливаем текущие значения
         data = self.tile_data[row][col]
         if data.opened:
             self.tile_type_var.set(data.value if data.value != 'unknown' else 'common')
@@ -623,23 +686,30 @@ class SnowmanSolverApp:
             self.tile_type_var.set("common")
             self.hint_type_var.set("common")
         
-        # Активируем кнопки
         self.save_btn.config(state=tk.NORMAL)
         self.clear_btn.config(state=tk.NORMAL)
-        self.cancel_btn.config(state=tk.NORMAL)
         
-        # Подсвечиваем выбранную плитку
+        # Обновляем выделение
         self.update_tile_selection(row, col)
     
     def update_tile_selection(self, row: int, col: int):
         """Обновить выделение выбранной плитки"""
-        # Сбрасываем все подсветки
         for i, btn in enumerate(self.tile_buttons):
-            btn.config(relief=tk.RAISED)
-        
-        # Подсвечиваем выбранную плитку
-        index = row * COLS + col
-        self.tile_buttons[index].config(relief=tk.SUNKEN, borderwidth=3)
+            r = i // COLS
+            c = i % COLS
+            data = self.tile_data[r][c]
+            
+            if self.suggested_tile and r == self.suggested_tile.row and c == self.suggested_tile.col:
+                btn.config(bg=self.colors['suggestion'])
+            elif r == row and c == col:
+                btn.config(bg=self.colors['selection'])  # КРАСНЫЙ для выбранной плитки
+            elif data.opened:
+                if data.value == 'gold':
+                    btn.config(bg=self.colors['gold'])
+                else:
+                    btn.config(bg=self.colors['tile_opened'])
+            else:
+                btn.config(bg=self.colors['tile_closed'])
     
     def save_tile_info(self):
         """Сохранить информацию о плитке"""
@@ -665,27 +735,8 @@ class SnowmanSolverApp:
         self.update_tile_ui(row, col)
         self.update_suggestion()
         
-        # Сбрасываем радиокнопки
         self.tile_type_var.set("common")
         self.hint_type_var.set("common")
-    
-    def cancel_selection(self):
-        """Отменить выбор плитки"""
-        self.current_edit = None
-        self.panel_coords.config(text="Не выбрана")
-        
-        # Сбрасываем радиокнопки
-        self.tile_type_var.set("common")
-        self.hint_type_var.set("common")
-        
-        # Отключаем кнопки
-        self.save_btn.config(state=tk.DISABLED)
-        self.clear_btn.config(state=tk.DISABLED)
-        self.cancel_btn.config(state=tk.DISABLED)
-        
-        # Сбрасываем подсветку плиток
-        for btn in self.tile_buttons:
-            btn.config(relief=tk.RAISED)
     
     def update_tile_ui(self, row: int, col: int):
         """Обновить отображение плитки"""
@@ -695,33 +746,39 @@ class SnowmanSolverApp:
         
         if data.opened:
             if data.value == 'gold':
-                btn.config(text="🥇", bg='#ffd700', fg='#333333')
+                btn.config(text="🥇", bg=self.colors['gold'], fg='#333333')
             else:
-                btn.config(text="🟫", bg='#3d3d3d', fg='#e0e0e0')
+                btn.config(text="□", bg=self.colors['tile_opened'], fg=self.colors['text'])
             
-            # Добавляем подсказку
             if data.hint == 'gold':
-                btn.config(text=f"{btn.cget('text')} ⭐")
+                btn.config(text=f"{btn.cget('text')}✨")
         else:
-            btn.config(text="?", bg='#555555', fg='#e0e0e0')
+            btn.config(text="?", bg=self.colors['tile_closed'], fg=self.colors['text'])
+        
+        # Обновляем выделение
+        if self.current_edit and row == self.current_edit[0] and col == self.current_edit[1]:
+            btn.config(bg=self.colors['selection'])
+        elif self.suggested_tile and row == self.suggested_tile.row and col == self.suggested_tile.col:
+            btn.config(bg=self.colors['suggestion'])
     
     def update_suggestion(self):
         """Обновить подсказку"""
-        # Создаем сетку
         grid = Grid(ROWS, COLS, TOTAL_GOLD)
         grid.init_from_tile_data(self.tile_data)
         
-        # Проверяем, найдены ли все золотые плитки
         if grid.golds_found >= TOTAL_GOLD:
-            self.info_label.config(text="🎉 Все золотые плитки найдены!")
+            self.suggestion_text.config(text="🎉 Все золотые плитки найдены!")
+            self.suggested_tile = None
+            self.update_tile_selection(-1, -1)
             return
         
-        # Создаем решатель
         solver = BruteforceProbabilitySolver(grid)
         solver.update_possible_configurations()
         
         if solver.possible_configurations_remaining == 0:
-            self.info_label.config(text="⚠️ Невозможная конфигурация! Проверьте введённые данные.")
+            self.suggestion_text.config(text="⚠️ Невозможная конфигурация!")
+            self.suggested_tile = None
+            self.update_tile_selection(-1, -1)
             return
         
         solver.update_probabilities()
@@ -732,13 +789,19 @@ class SnowmanSolverApp:
     
     def show_suggestion(self, next_tile):
         """Показать подсказку"""
+        self.suggested_tile = next_tile
+        
         if not next_tile:
-            self.info_label.config(text="ℹ️ Нет доступных подсказок.")
+            self.suggestion_text.config(text="Подсказки недоступны")
+            self.update_tile_selection(-1, -1)
             return
         
-        self.info_label.config(
-            text=f"🎯 Рекомендуемая плитка: Строка {next_tile.row+1}, Колонка {next_tile.col+1}"
+        self.suggestion_text.config(
+            text=f"Откройте плитку в Строке {next_tile.row+1}, Колонке {next_tile.col+1}"
         )
+        
+        # Подсвечиваем предложенную плитку
+        self.update_tile_selection(-1, -1)
     
     def reset_game(self):
         """Сбросить игру"""
@@ -746,12 +809,20 @@ class SnowmanSolverApp:
         for r in range(ROWS):
             for c in range(COLS):
                 self.update_tile_ui(r, c)
-        self.cancel_selection()
+        
+        self.current_edit = None
+        self.suggested_tile = None
+        self.panel_coords.config(text="Плитка не выбрана")
+        self.tile_type_var.set("common")
+        self.hint_type_var.set("common")
+        self.save_btn.config(state=tk.DISABLED)
+        self.clear_btn.config(state=tk.DISABLED)
+        self.suggestion_text.config(text="Выберите плитки для получения подсказок")
         self.update_suggestion()
     
     def setup_keyboard_shortcuts(self):
         """Настройка горячих клавиш"""
-        self.root.bind('<Escape>', lambda e: self.cancel_selection())
+        self.root.bind('<Escape>', lambda e: self.reset_game())
         self.root.bind('<Control-r>', lambda e: self.reset_game())
 
 def main():
@@ -759,7 +830,6 @@ def main():
     root = tk.Tk()
     app = SnowmanSolverApp(root)
     
-    # Центрирование окна
     root.update_idletasks()
     x = (root.winfo_screenwidth() // 2) - (WINDOW_WIDTH // 2)
     y = (root.winfo_screenheight() // 2) - (WINDOW_HEIGHT // 2)
