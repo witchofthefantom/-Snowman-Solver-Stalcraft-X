@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Snowman Solver - Решатель головоломки</title>
+<style>
+  :root {
+    --bg-color: #f9f9f9;
+    --text-color: #333;
+    --panel-bg: #fff;
+    --panel-border: #ccc;
+    --tile-bg: #ccc;
+    --tile-opened: #eee;
+    --gold-tile: gold;
+    --suggested-outline: #ff4444;
+    --button-bg: #4CAF50;
+    --button-text: white;
+    --shadow-color: rgba(0,0,0,0.2);
+    --hint-icon-color: #ff4444;
+    --clear-btn-bg: #ff9800;
+    --clear-btn-hover: #f57c00;
+  }
+
+  [data-theme="dark"] {
+    --bg-color: #1a1a1a;
+    --text-color: #e0e0e0;
+    --panel-bg: #2d2d2d;
+    --panel-border: #444;
+    --tile-bg: #555;
+    --tile-opened: #3d3d3d;
+    --gold-tile: #ffd700;
+    --suggested-outline: #ff6b6b;
+    --button-bg: #45a049;
+    --button-text: #fff;
+    --shadow-color: rgba(0,0,0,0.5);
+    --hint-icon-color: #ff6b6b;
+    --clear-btn-bg: #ff9800;
+    --clear-btn-hover: #f57c00;
+  }
+
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background: var(--bg-color);
+    color: var(--text-color);
+    transition: background-color 0.3s, color 0.3s;
+  }
+
+  .main-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 30px auto;
+    max-width: 900px;
+    position: relative;
+    padding: 0 20px;
+  }
+
+  .header-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 24px;
+    text-align: center;
+  }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .theme-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px 12px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    user-select: none;
+  }
+
+  .theme-switch input {
+    display: none;
+  }
+
+  .theme-switch span {
+    font-size: 18px;
+  }
+
+  #container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    width: 100%;
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(6, 70px);
+    grid-gap: 5px;
+    margin-bottom: 20px;
+    justify-content: center;
+  }
+
+  .tile {
+    width: 70px;
+    height: 70px;
+    background: var(--tile-bg);
+    cursor: pointer;
+    position: relative;
+    user-select: none;
+    font-weight: bold;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s, transform 0.1s;
+  }
+
+  .tile:hover {
+    transform: scale(1.05);
+  }
+
+  .opened {
+    background: var(--tile-opened);
+  }
+
+  .gold-tile {
+    background: var(--gold-tile) !important;
+  }
+
+  .suggested {
+    outline: 3px solid var(--suggested-outline);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { outline-color: var(--suggested-outline); }
+    50% { outline-color: rgba(255, 107, 107, 0.5); }
+    100% { outline-color: var(--suggested-outline); }
+  }
+
+  .hint-icon {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 16px;
+    color: var(--hint-icon-color);
+  }
+
+  #info {
+    margin-top: 10px;
+    font-size: 16px;
+    text-align: center;
+    min-height: 24px;
+    width: 100%;
+  }
+
+  #panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 280px;
+    border: 1px solid var(--panel-border);
+    padding: 15px;
+    background: var(--panel-bg);
+    box-shadow: 0 0 10px var(--shadow-color);
+    z-index: 1000;
+    border-radius: 8px;
+  }
+
+  #panel.hidden {
+    display: none;
+  }
+
+  #panel h2 {
+    font-size: 18px;
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--text-color);
+  }
+
+  #panel p {
+    margin: 0 0 15px 0;
+    color: var(--text-color);
+  }
+
+  .radio-group {
+    margin-bottom: 15px;
+    font-size: 14px;
+  }
+
+  .radio-group label {
+    display: block;
+    margin-bottom: 8px;
+    cursor: pointer;
+    color: var(--text-color);
+  }
+
+  .radio-group input[type="radio"] {
+    margin-right: 8px;
+  }
+
+  #panel button {
+    margin-right: 10px;
+    padding: 8px 16px;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    background: var(--button-bg);
+    color: var(--button-text);
+    transition: opacity 0.2s;
+  }
+
+  #panel button:hover {
+    opacity: 0.9;
+  }
+
+  #cancel-btn {
+    background: #666;
+  }
+
+  #clear-btn {
+    background: var(--clear-btn-bg);
+  }
+
+  #clear-btn:hover {
+    background: var(--clear-btn-hover);
+  }
+
+  .panel-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 15px;
+  }
+
+  .panel-buttons button {
+    flex: 1;
+    min-width: 80px;
+  }
+
+  .button-group {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+
+  #reset-btn {
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    border: none;
+    border-radius: 4px;
+    background: var(--button-bg);
+    color: var(--button-text);
+    transition: all 0.2s;
+  }
+
+  #reset-btn:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+  }
+
+  .instructions {
+    margin-top: 30px;
+    padding: 20px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    max-width: 600px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .instructions h3 {
+    margin-top: 0;
+    color: var(--text-color);
+  }
+
+  .instructions ul {
+    padding-left: 20px;
+    margin: 0;
+  }
+
+  .instructions li {
+    margin-bottom: 8px;
+    color: var(--text-color);
+  }
+
+  @media (max-width: 768px) {
+    #board {
+      grid-template-columns: repeat(6, 50px);
+      grid-gap: 4px;
+    }
+    
+    .tile {
+      width: 50px;
+      height: 50px;
+      font-size: 14px;
+    }
+    
+    #panel {
+      width: 90%;
+      max-width: 300px;
+    }
+    
+    .header-controls {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    
+    .button-group {
+      flex-direction: column;
+      align-items: center;
+    }
+    
+    .button-group button {
+      width: 100%;
+      max-width: 250px;
+    }
+    
+    .instructions {
+      padding: 15px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    #board {
+      grid-template-columns: repeat(6, 45px);
+      grid-gap: 3px;
+    }
+    
+    .tile {
+      width: 45px;
+      height: 45px;
+      font-size: 12px;
+    }
+    
+    h1 {
+      font-size: 20px;
+    }
+    
+    .theme-switch {
+      padding: 6px 10px;
+      font-size: 14px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="main-container">
+  <div class="header-controls">
+    <h1>❄️ Snowman Solver - Решатель головоломки</h1>
+    <div class="controls">
+      <div class="theme-switch" id="theme-switch">
+        <input type="checkbox" id="theme-toggle">
+        <span id="theme-icon">🌙</span>
+        <span id="theme-text">Тёмная тема</span>
+      </div>
+    </div>
+  </div>
+  
+  <div id="container">
+    <div id="board"></div>
+    <div id="info"></div>
+    
+    <div class="button-group">
+      <button id="reset-btn">🔄 Начать заново</button>
+    </div>
+    
+    <div id="panel" class="hidden">
+      <h2>📝 Информация о плитке</h2>
+      <p id="panel-tile">Строка: N/A, Колонка: N/A</p>
+      
+      <div class="radio-group">
+        <label>Тип плитки:</label>
+        <label><input type="radio" name="value" value="gold"> Золотая 🥇</label>
+        <label><input type="radio" name="value" value="common" checked> Обычная 🟫</label>
+      </div>
+      
+      <div class="radio-group">
+        <label>Подсказка о соседях:</label>
+        <label><input type="radio" name="hint" value="gold"> Есть золотой сосед ⭐</label>
+        <label><input type="radio" name="hint" value="common" checked> Нет золотых соседей 🚫</label>
+      </div>
+      
+      <div class="panel-buttons">
+        <button id="save-btn">💾 Сохранить</button>
+        <button id="clear-btn">🧹 Очистить</button>
+        <button id="cancel-btn">❌ Отмена</button>
+      </div>
+    </div>
+  </div>
+  
+  <div class="instructions">
+    <h3>📖 Как пользоваться:</h3>
+    <ul>
+      <li><strong>Цель:</strong> Найти все 4 золотые плитки на поле 5×6</li>
+      <li><strong>Кликните по плитке</strong>, чтобы указать её тип и информацию о соседях</li>
+      <li><strong>Золотая плитка</strong> - содержит золото (🥇)</li>
+      <li><strong>Обычная плитка</strong> - не содержит золота (🟫)</li>
+      <li><strong>Подсказка о соседях:</strong>
+        <ul>
+          <li>⭐ - хотя бы один сосед золотой</li>
+          <li>🚫 - среди соседей нет золотых</li>
+        </ul>
+      </li>
+      <li><strong>Красная подсветка</strong> - рекомендуемая плитка для открытия</li>
+      <li><strong>"Очистить" в панели</strong> - удалить информацию с текущей редактируемой плитки</li>
+      <li><strong>"Начать заново"</strong> - полностью сбросить игру</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+// -------------------- Инициализация темы --------------------
+const themeToggle = document.getElementById('theme-toggle');
+const themeIcon = document.getElementById('theme-icon');
+const themeText = document.getElementById('theme-text');
+
+function updateTheme() {
+  if (themeToggle.checked) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    themeIcon.textContent = '☀️';
+    themeText.textContent = 'Светлая тема';
+    localStorage.setItem('theme', 'dark');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    themeIcon.textContent = '🌙';
+    themeText.textContent = 'Тёмная тема';
+    localStorage.setItem('theme', 'light');
+  }
+}
+
+// Загружаем сохранённую тему
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'dark') {
+  themeToggle.checked = true;
+}
+updateTheme();
+
+themeToggle.addEventListener('change', updateTheme);
+themeIcon.addEventListener('click', () => {
+  themeToggle.checked = !themeToggle.checked;
+  updateTheme();
+});
+
+// -------------------- Структуры данных и переменные --------------------
+const rows = 5;
+const cols = 6;
+const totalGold = 4;
+
+let tileData = [];
+function initializeTileData() {
+  tileData = [];
+  for (let r = 0; r < rows; r++) {
+    tileData[r] = [];
+    for (let c = 0; c < cols; c++) {
+      tileData[r][c] = {
+        opened: false,
+        value: 'unknown',  // 'gold' или 'common'
+        hint: 'unknown'    // 'gold' или 'common'
+      };
+    }
+  }
+}
+initializeTileData();
+
+const boardEl = document.getElementById('board');
+function buildBoardUI() {
+  boardEl.innerHTML = '';
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const div = document.createElement('div');
+      div.className = 'tile';
+      div.dataset.r = r;
+      div.dataset.c = c;
+      div.textContent = '?';
+      div.addEventListener('click', () => openPanel(r, c));
+      boardEl.appendChild(div);
+    }
+  }
+}
+buildBoardUI();
+
+// -------------------- Элементы интерфейса --------------------
+const panel = document.getElementById('panel');
+const panelTile = document.getElementById('panel-tile');
+const saveBtn = document.getElementById('save-btn');
+const clearBtn = document.getElementById('clear-btn');
+const cancelBtn = document.getElementById('cancel-btn');
+const resetBtn = document.getElementById('reset-btn');
+
+saveBtn.addEventListener('click', saveTileInfo);
+clearBtn.addEventListener('click', clearCurrentTile);
+cancelBtn.addEventListener('click', closePanelWithoutSaving);
+resetBtn.addEventListener('click', resetGame);
+
+let currentEdit = null;
+
+// -------------------- Функции для очистки плиток --------------------
+function clearCurrentTile() {
+  if (!currentEdit) return;
+  
+  const r = currentEdit.r;
+  const c = currentEdit.c;
+  
+  // Сбрасываем данные плитки
+  tileData[r][c] = {
+    opened: false,
+    value: 'unknown',
+    hint: 'unknown'
+  };
+  
+  // Обновляем UI
+  updateTileUI(r, c);
+  
+  // Закрываем панель
+  panel.classList.add('hidden');
+  currentEdit = null;
+  
+  // Пересчитываем подсказки
+  runSolverAndSuggest();
+}
+
+function closePanelWithoutSaving() {
+  panel.classList.add('hidden');
+  currentEdit = null;
+}
+
+// -------------------- Классы и логика решателя --------------------
+const Category = { SPECIAL: 'gold', COMMON: 'common' };
+
+class Tile {
+  constructor(row, col) {
+    this.row = row;
+    this.col = col;
+    this.opened = false;
+    this.category = Category.COMMON;
+    this.neighborHint = "Common"; // "Gold" или "Common"
+  }
+}
+
+class Grid {
+  constructor(rows, cols, golds) {
+    this.rows = rows;
+    this.cols = cols;
+    this.golds = golds;
+    this.tiles = [];
+    this.tilesList = [];
+    this.goldsFound = 0;
+  }
+  
+  initFromTileData(tileData) {
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        let t = new Tile(r, c);
+        const d = tileData[r][c];
+        t.opened = d.opened;
+        if (d.value === 'gold') {
+          t.category = Category.SPECIAL;
+          if (t.opened) this.goldsFound++;
+        } else {
+          t.category = Category.COMMON;
+        }
+        t.neighborHint = (d.hint === 'gold') ? "Gold" : "Common";
+        this.tiles.push(t);
+        this.tilesList.push(t);
+      }
+    }
+  }
+  
+  getNeighbors(tile) {
+    let neighbors = [];
+    let {row, col} = tile;
+    if (row > 0) neighbors.push(this.getTile(row-1, col));
+    if (row < this.rows - 1) neighbors.push(this.getTile(row+1, col));
+    if (col > 0) neighbors.push(this.getTile(row, col-1));
+    if (col < this.cols - 1) neighbors.push(this.getTile(row, col+1));
+    return neighbors;
+  }
+  
+  getTile(r, c) {
+    return this.tiles[r * this.cols + c];
+  }
+
+  openTile(tile) {
+    tile.opened = true;
+    if (tile.category === Category.SPECIAL) this.goldsFound++;
+  }
+}
+
+class BruteforceProbabilitySolver {
+  constructor(grid) {
+    this.grid = grid;
+
+    const numTiles = grid.tilesList.length;
+    this.possibleConfigurations = this.getPossibleConfigurations(4, numTiles);
+    this.possibleConfigurationsRemaining = this.possibleConfigurations.length;
+    this.configurationsPerGoldTile = new Array(numTiles).fill(0);
+    this.configurationsPerGoldHintTile = new Array(numTiles).fill(0);
+
+    this.neighborsIndex = new Array(numTiles);
+    for (let i = 0; i < numTiles; i++) {
+      let tile = grid.tilesList[i];
+      this.neighborsIndex[i] = grid.getNeighbors(tile).map(nt => this.getTileIndex(nt));
+    }
+
+    this.remainingConfigurationsAfterOpenEstimate = new Array(numTiles).fill(0);
+  }
+
+  getTileIndex(tile) {
+    return tile.col + tile.row * this.grid.cols;
+  }
+
+  getPossibleConfigurations(golds, numTiles) {
+    let combos = [];
+    for (let p1 = 0; p1 < numTiles; p1++) {
+      for (let p2 = p1+1; p2 < numTiles; p2++) {
+        for (let p3 = p2+1; p3 < numTiles; p3++) {
+          for (let p4 = p3+1; p4 < numTiles; p4++) {
+            let configuration = (p1) | (p2 << 8) | (p3 << 16) | (p4 << 24);
+            combos.push(configuration);
+          }
+        }
+      }
+    }
+    return combos;
+  }
+
+  isGoldTileInConfiguration(configuration, tileIndex) {
+    return ((configuration & 0xFF) === tileIndex
+      || ((configuration >> 8) & 0xFF) === tileIndex
+      || ((configuration >> 16) & 0xFF) === tileIndex
+      || ((configuration >> 24) & 0xFF) === tileIndex);
+  }
+
+  removePossibleConfiguration(i) {
+    this.possibleConfigurations[i] = this.possibleConfigurations[--this.possibleConfigurationsRemaining];
+  }
+
+  updatePossibleConfigurations() {
+    this.possibleConfigurations = this.getPossibleConfigurations(4, this.grid.tilesList.length);
+    this.possibleConfigurationsRemaining = this.possibleConfigurations.length;
+
+    for (let tile of this.grid.tilesList) {
+      if (tile.opened) {
+        this.narrowDownPossibleConfigurations(tile);
+      }
+    }
+  }
+
+  narrowDownPossibleConfigurations(openTile) {
+    let isGold = (openTile.category === Category.SPECIAL);
+    let isGoldHint = (openTile.neighborHint === "Gold");
+    let tileIndex = this.getTileIndex(openTile);
+
+    let i = 0;
+    while (i < this.possibleConfigurationsRemaining) {
+      let configuration = this.possibleConfigurations[i];
+      if (isGold !== this.isGoldTileInConfiguration(configuration, tileIndex)) {
+        this.removePossibleConfiguration(i);
+        continue;
+      }
+
+      if (isGoldHint) {
+        if (!this.hasGoldNeighbors(tileIndex, configuration)) {
+          this.removePossibleConfiguration(i);
+          continue;
+        }
+      } else {
+        let remove = false;
+        for (let neighborTileIndex of this.neighborsIndex[tileIndex]) {
+          if (this.isGoldTileInConfiguration(configuration, neighborTileIndex)) {
+            remove = true; break;
+          }
+        }
+        if (remove) {
+          this.removePossibleConfiguration(i);
+          continue;
+        }
+      }
+      i++;
+    }
+  }
+
+  hasGoldNeighbors(tileIndex, configuration) {
+    for (let neighborTileIndex of this.neighborsIndex[tileIndex]) {
+      if (this.isGoldTileInConfiguration(configuration, neighborTileIndex)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  updateProbabilities() {
+    this.configurationsPerGoldTile.fill(0);
+    this.configurationsPerGoldHintTile.fill(0);
+
+    for (let i = 0; i < this.possibleConfigurationsRemaining; i++) {
+      let configuration = this.possibleConfigurations[i];
+      let goldIndices = [
+        (configuration & 0xFF),
+        ((configuration >> 8) & 0xFF),
+        ((configuration >> 16) & 0xFF),
+        ((configuration >> 24) & 0xFF)
+      ];
+
+      let goldHintBits = 0n;
+      for (let gi of goldIndices) {
+        this.configurationsPerGoldTile[gi]++;
+        for (let neighborTileIndex of this.neighborsIndex[gi]) {
+          goldHintBits |= (1n << BigInt(neighborTileIndex));
+        }
+      }
+
+      for (let neighborTileIndex = 0; neighborTileIndex < this.grid.tilesList.length; neighborTileIndex++) {
+        if ((goldHintBits & (1n << BigInt(neighborTileIndex))) !== 0n) {
+          this.configurationsPerGoldHintTile[neighborTileIndex]++;
+        }
+      }
+    }
+  }
+
+  updateRemainingConfigurationsAfterOpenEstimate() {
+    for (let tile of this.grid.tilesList) {
+      let tileIndex = this.getTileIndex(tile);
+      this.remainingConfigurationsAfterOpenEstimate[tileIndex] = this.calcRemainingConfigurationsAfterOpenEstimate(tile);
+    }
+  }
+
+  calcRemainingConfigurationsAfterOpenEstimate(openTile) {
+    let tileIndex = this.getTileIndex(openTile);
+    let goldProbability = this.configurationsPerGoldTile[tileIndex] / this.possibleConfigurationsRemaining;
+    let goldHintProbability = this.configurationsPerGoldHintTile[tileIndex] / this.possibleConfigurationsRemaining;
+
+    let weightedAverage = 0.0;
+    weightedAverage += this.getPossibleConfigurationsAfterOpen(openTile, false, false) * (1.0 - goldProbability) * (1.0 - goldHintProbability);
+    weightedAverage += this.getPossibleConfigurationsAfterOpen(openTile, false, true) * (1.0 - goldProbability) * (goldHintProbability);
+    weightedAverage += this.getPossibleConfigurationsAfterOpen(openTile, true, false) * (goldProbability) * (1.0 - goldHintProbability);
+    weightedAverage += this.getPossibleConfigurationsAfterOpen(openTile, true, true) * (goldProbability) * (goldHintProbability);
+    return weightedAverage;
+  }
+
+  getPossibleConfigurationsAfterOpen(openTile, isGold, isGoldHint) {
+    let tileIndex = this.getTileIndex(openTile);
+    let remainingConfigurations = 0;
+    for (let i = 0; i < this.possibleConfigurationsRemaining; i++) {
+      let configuration = this.possibleConfigurations[i];
+      if (isGold !== this.isGoldTileInConfiguration(configuration, tileIndex)) continue;
+      if (isGoldHint) {
+        if (!this.hasGoldNeighbors(tileIndex, configuration)) continue;
+      } else {
+        let skip = false;
+        for (let neighborTileIndex of this.neighborsIndex[tileIndex]) {
+          if (this.isGoldTileInConfiguration(configuration, neighborTileIndex)) {
+            skip = true; break;
+          }
+        }
+        if (skip) continue;
+      }
+      remainingConfigurations++;
+    }
+    return remainingConfigurations;
+  }
+
+  getTilePriority(tile) {
+    let tileIndex = this.getTileIndex(tile);
+    let goldProbability = this.configurationsPerGoldTile[tileIndex] / this.possibleConfigurationsRemaining;
+    let excludedConfigurationsShare = 1.0 - this.remainingConfigurationsAfterOpenEstimate[tileIndex] / this.possibleConfigurationsRemaining;
+    return 1.0 - Math.pow(1.0 - goldProbability, 1.0) * Math.pow(1.0 - excludedConfigurationsShare, 2.0);
+  }
+
+  getNextTileToOpen() {
+    let unopenedTiles = this.grid.tilesList.filter(t => !t.opened);
+    if (unopenedTiles.length === 0) return null;
+    unopenedTiles.sort((a,b) => this.getTilePriority(b) - this.getTilePriority(a));
+    return unopenedTiles[0];
+  }
+}
+
+// -------------------- Интеграция решателя с интерфейсом --------------------
+function openPanel(r, c) {
+  currentEdit = {r, c};
+  panel.classList.remove('hidden');
+  panelTile.textContent = `Строка: ${r+1}, Колонка: ${c+1}`;
+
+  const valGold = panel.querySelector('input[name="value"][value="gold"]');
+  const valCommon = panel.querySelector('input[name="value"][value="common"]');
+  const hintGold = panel.querySelector('input[name="hint"][value="gold"]');
+  const hintCommon = panel.querySelector('input[name="hint"][value="common"]');
+
+  const d = tileData[r][c];
+  if (d.value === 'gold') {
+    valGold.checked = true;
+  } else {
+    valCommon.checked = true;
+  }
+
+  if (d.hint === 'gold') {
+    hintGold.checked = true;
+  } else {
+    hintCommon.checked = true;
+  }
+}
+
+function saveTileInfo() {
+  if (!currentEdit) return;
+  const r = currentEdit.r;
+  const c = currentEdit.c;
+  const val = panel.querySelector('input[name="value"]:checked').value;
+  const hint = panel.querySelector('input[name="hint"]:checked').value;
+
+  tileData[r][c].opened = true;
+  tileData[r][c].value = val;
+  tileData[r][c].hint = hint;
+
+  updateTileUI(r, c);
+  panel.classList.add('hidden');
+  currentEdit = null;
+  runSolverAndSuggest();
+}
+
+function updateTileUI(r,c) {
+  const idx = r * cols + c;
+  const tileEl = boardEl.children[idx];
+  
+  // Сбрасываем состояние плитки
+  tileEl.classList.remove('opened', 'gold-tile', 'suggested');
+  tileEl.textContent = '?';
+  
+  const oldIcon = tileEl.querySelector('.hint-icon');
+  if (oldIcon) oldIcon.remove();
+
+  // Если плитка открыта, показываем её содержимое
+  if (tileData[r][c].opened) {
+    tileEl.classList.add('opened');
+    if (tileData[r][c].value === 'gold') {
+      tileEl.textContent = '🥇';
+      tileEl.classList.add('gold-tile');
+    } else {
+      tileEl.textContent = '🟫';
+    }
+
+    if (tileData[r][c].hint === 'gold') {
+      const icon = document.createElement('span');
+      icon.className = 'hint-icon';
+      icon.textContent = '⭐';
+      tileEl.appendChild(icon);
+    }
+  }
+}
+
+function clearSuggestions() {
+  for (let i = 0; i < boardEl.children.length; i++) {
+    boardEl.children[i].classList.remove('suggested');
+  }
+}
+
+function runSolverAndSuggest() {
+  let g = new Grid(rows, cols, totalGold);
+  g.initFromTileData(tileData);
+
+  const infoEl = document.getElementById('info');
+
+  if (g.goldsFound >= totalGold) {
+    infoEl.textContent = "🎉 Все золотые плитки найдены!";
+    clearSuggestions();
+    return;
+  }
+
+  let solver = new BruteforceProbabilitySolver(g);
+  solver.updatePossibleConfigurations();
+
+  if (solver.possibleConfigurationsRemaining === 0) {
+    clearSuggestions();
+    infoEl.textContent = "⚠️ Невозможная конфигурация! Проверьте введённые данные.";
+    return;
+  }
+
+  solver.updateProbabilities();
+  solver.updateRemainingConfigurationsAfterOpenEstimate();
+
+  let nextTile = solver.getNextTileToOpen();
+  showSuggestion(nextTile);
+}
+
+function showSuggestion(nextTile) {
+  clearSuggestions();
+  const infoEl = document.getElementById('info');
+  if (!nextTile) {
+    infoEl.textContent = "ℹ️ Нет доступных подсказок.";
+    return;
+  }
+  const idx = nextTile.row * cols + nextTile.col;
+  boardEl.children[idx].classList.add('suggested');
+  infoEl.textContent = `🎯 Рекомендуемая плитка: Строка ${nextTile.row+1}, Колонка ${nextTile.col+1}`;
+}
+
+function resetGame() {
+  // Убрано подтверждение
+  initializeTileData();
+  buildBoardUI();
+  panel.classList.add('hidden');
+  currentEdit = null;
+  runSolverAndSuggest();
+}
+
+// Начальная подсказка
+runSolverAndSuggest();
+</script>
+</body>
+</html>
